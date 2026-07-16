@@ -1,5 +1,6 @@
 import { getBrowserContext, USER_AGENT, PROFILE_DIR, getBravePath } from '../browser.js';
 import { chromium } from 'playwright';
+import { logActivity, saveOutput } from '../utils/logger.js';
 
 function extractVideoId(target: string): string {
     const cleaned = target.trim();
@@ -20,19 +21,19 @@ function extractVideoId(target: string): string {
 }
 
 function selectTrack(captionTracks: any[], requestedLang?: string) {
-    let track = captionTracks.find(t => t.languageCode === requestedLang);
+    let track = captionTracks.find((t: any) => t.languageCode === requestedLang);
     if (track) return { track, translate: false };
 
     if (requestedLang) {
         const baseLang = requestedLang.split('-')[0];
-        track = captionTracks.find(t => t.languageCode.startsWith(baseLang));
+        track = captionTracks.find((t: any) => t.languageCode.startsWith(baseLang!));
         if (track) return { track, translate: false };
     }
 
-    track = captionTracks.find(t => t.languageCode === 'en');
+    track = captionTracks.find((t: any) => t.languageCode === 'en');
     if (track) return { track, translate: false };
 
-    track = captionTracks.find(t => t.languageCode.startsWith('en'));
+    track = captionTracks.find((t: any) => t.languageCode.startsWith('en'));
     if (track) return { track, translate: false };
 
     if (requestedLang && captionTracks[0].isTranslatable) {
@@ -104,7 +105,7 @@ function processTranscript(transcriptItems: {text: string, start: number}[]) {
 }
 
 async function fetchTranscriptWithPlaywright(videoId: string, requestedLang?: string) {
-    console.error('Direct fetch failed or blocked. Launching browser fallback...');
+    logActivity('youtube', 'Direct fetch failed or blocked. Launching browser fallback...');
 
     // We use the same persistent context as the rest of the app, ensuring login state is shared.
     const context = await getBrowserContext(false);
@@ -138,7 +139,7 @@ async function fetchTranscriptWithPlaywright(videoId: string, requestedLang?: st
         }
         const finalUrl = urlObj.toString();
 
-        console.error(`[DEBUG Playwright] Requesting track URL: ${finalUrl}`);
+        logActivity('youtube-debug', `Requesting track URL from browser: ${finalUrl}`);
 
         const xmlText = await page.evaluate(async (fetchUrl) => {
             const response = await fetch(fetchUrl);
@@ -161,6 +162,7 @@ export async function getYouTubeTranscript(target: string, lang?: string): Promi
     const videoId = extractVideoId(target);
 
     if (!videoId) {
+        logActivity('youtube-error', `Invalid YouTube URL or ID: ${target}`);
         return `[ERR] Invalid YouTube URL or ID: ${target}`;
     }
 
@@ -169,7 +171,7 @@ export async function getYouTubeTranscript(target: string, lang?: string): Promi
     let xmlText = '';
 
     try {
-        console.error(`Fetching metadata and transcript for: ${videoId}`);
+        logActivity('youtube', `Fetching metadata and transcript for: ${videoId}`);
         const watchResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -213,18 +215,16 @@ export async function getYouTubeTranscript(target: string, lang?: string): Promi
         }
 
         const availableLangs = captionTracks.map((t: any) => t.languageCode);
-        console.error(`[VIDEO] ${title}`);
-        console.error(`[CHANNEL] ${author}`);
-        console.error(`[LANG] Available: ${availableLangs.join(', ')}`);
+        logActivity('youtube-info', `Title: ${title} | Channel: ${author} | Langs: ${availableLangs.join(', ')}`);
 
         const { track, translate, targetLang } = selectTrack(captionTracks, lang);
         const urlObj = new URL(track.baseUrl);
         urlObj.searchParams.set('fmt', 'srv1');
         if (translate && targetLang) {
             urlObj.searchParams.set('tlang', targetLang);
-            console.error(`[LANG] Requesting translation to: ${targetLang}`);
+            logActivity('youtube-info', `Requesting translation to: ${targetLang}`);
         } else {
-            console.error(`[LANG] Using: ${track.languageCode}`);
+            logActivity('youtube-info', `Using track: ${track.languageCode}`);
         }
         const fetchUrl = urlObj.toString();
 
@@ -234,27 +234,33 @@ export async function getYouTubeTranscript(target: string, lang?: string): Promi
         }
 
     } catch (directError) {
-        console.error(`[INFO] Direct fetch failed: ${(directError as Error).message}`);
+        logActivity('youtube-warning', `Direct fetch failed: ${(directError as Error).message}`);
         try {
             const result = await fetchTranscriptWithPlaywright(videoId, lang);
             title = result.title;
             author = result.author;
             xmlText = result.xmlText;
         } catch (playwrightError) {
-            console.error(`[ERR] All transcript fetch methods failed.`);
-            console.error(`Direct Fetch Error: ${(directError as Error).message}`);
-            console.error(`Playwright Error: ${(playwrightError as Error).message}`);
+            logActivity('youtube-error', `All transcript fetch methods failed.`);
+            logActivity('youtube-error', `Direct Fetch Error: ${(directError as Error).message}`);
+            logActivity('youtube-error', `Playwright Error: ${(playwrightError as Error).message}`);
             return "Error: Could not extract transcript via any method.";
         }
     }
 
     const segments = parseTranscriptXml(xmlText);
     if (segments.length === 0) {
+        logActivity('youtube-error', 'Transcript XML fetched but could not parse any text lines.');
         return '[ERR] Transcript XML fetched but could not parse any text lines.';
     }
 
     const paragraphs = processTranscript(segments);
     const content = `# ${title}\n\n` + paragraphs.join('\n\n');
+
+    logActivity('youtube-success', `Successfully extracted transcript (${paragraphs.length} paragraphs).`);
+
+    // Save output
+    saveOutput(`youtube_${videoId}`, content);
 
     return content;
 }
