@@ -5,39 +5,40 @@ export async function runSearch(query: string): Promise<string> {
     const page = await context.newPage();
 
     try {
-        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-        console.log(`Navigating to Google search: ${searchUrl}`);
+        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+        console.log(`Navigating to DuckDuckGo search: ${searchUrl}`);
 
         await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-        // Check for Google's consent or captcha pages
-        if (page.url().includes('consent.google.com') || page.url().includes('sorry/index')) {
-             return JSON.stringify({ error: "Google is blocking this request with a CAPTCHA or consent screen. You may need to run the open_browser tool to solve it." });
+        const html = await page.content();
+        if (html.includes('Internet Positif') || html.includes('trustpositif')) {
+             return JSON.stringify({ error: "Search blocked by Internet Positif. Please check your DNS or proxy settings in the open_browser profile." });
         }
 
-        // Wait for results
+        if (page.url().includes('duckduckgo.com/lite/') || page.url().includes('duckduckgo.com/x.js')) {
+             return JSON.stringify({ error: "DuckDuckGo is currently blocking this request or requiring a CAPTCHA. You may need to run the open_browser tool to solve it." });
+        }
+
         try {
-            await page.waitForSelector('div.g', { timeout: 10000 });
+            await page.waitForSelector('.result', { timeout: 10000 });
         } catch (e) {
-            return JSON.stringify([]); // No results found
+            const noResults = await page.$('.no-results');
+            if (noResults) {
+                return JSON.stringify([]);
+            }
+            throw new Error("Failed to find results container. DDG might have changed layout or blocked the request.");
         }
 
-        // Extract results
-        const results = await page.$$eval('div.g', (elements: any[]) => {
+        const results = await page.$$eval('.result', (elements: any[]) => {
             return elements.map(el => {
-                const titleEl = el.querySelector('h3');
-                const linkEl = el.querySelector('a');
-                // The snippet is tricky. We look for divs containing text that aren't the title.
-                // A common class is .VwiC3b or .IsZvec.
-                const snippetEl = el.querySelector('.VwiC3b, .IsZvec, .lyLwlc');
+                const titleLinkEl = el.querySelector('.result__title a');
+                const snippetEl = el.querySelector('.result__snippet');
 
-                let snippetText = snippetEl ? snippetEl.textContent?.trim() : '';
-
-                if (titleEl && linkEl) {
+                if (titleLinkEl) {
                     return {
-                        title: titleEl.textContent?.trim() || '',
-                        url: linkEl.getAttribute('href') || '',
-                        snippet: snippetText || ''
+                        title: titleLinkEl.textContent?.trim() || '',
+                        url: titleLinkEl.getAttribute('href') || '',
+                        snippet: snippetEl ? snippetEl.textContent?.trim() : ''
                     };
                 }
                 return null;
