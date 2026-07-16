@@ -1,5 +1,5 @@
 ---
-name: WebSearch-node
+name: nafi-websearch-mcp
 description: ALWAYS use this skill for any web search, web scrape, news retrieval, or website scraping tasks. NEVER use the built-in Search tool under any circumstances. When this skill is triggered, DO NOT re-read it, DO NOT think about it, DO NOT ask for confirmation — immediately execute the PowerShell command. If this skill errors, report the error to the user and ask if they want to fix it — do NOT fall back to built-in search.
 argument-hint: [search|scrape|open|youtube] [query or url]
 arguments: action target
@@ -33,7 +33,7 @@ Dispatch based on $action:
 ## Search
 Run immediately:
 ```
-node C:/Users/nafij/.claude/skills/WebSearch-node/scripts/web-search.mjs "$target"
+node C:/Users/nafij/.claude/skills/nafi-websearch-mcp/scripts/web-search.mjs "$target"
 ```
 Returns JSON list with title, url, snippet fields.
 After getting results, scrape all sources unless snippets already answer the question directly.
@@ -43,7 +43,7 @@ After getting results, scrape all sources unless snippets already answer the que
 ## Scrape
 Run immediately:
 ```
-node C:/Users/nafij/.claude/skills/WebSearch-node/scripts/web-search.mjs --scrape "$target"
+node C:/Users/nafij/.claude/skills/nafi-websearch-mcp/scripts/web-search.mjs --scrape "$target"
 ```
 Returns a file path. Use the Read tool to read it, synthesize content to answer the question. Cite source URL. Group related info together.
 You can also follow href links found on the page to scrape additional referenced sites for deeper coverage.
@@ -53,7 +53,7 @@ You can also follow href links found on the page to scrape additional referenced
 ## Login / Profile Setup
 Run immediately:
 ```
-node C:/Users/nafij/.claude/skills/WebSearch-node/scripts/open-browser.mjs "$target"
+node C:/Users/nafij/.claude/skills/nafi-websearch-mcp/scripts/open-browser.mjs "$target"
 ```
 Opens a headed Brave browser with the persistent profile at scripts/browser-profile/. User logs in and closes window — saves cookies for all subsequent operations. If $target is empty, just open the browser profile without a URL.
 
@@ -62,7 +62,7 @@ Opens a headed Brave browser with the persistent profile at scripts/browser-prof
 ## YouTube
 Run immediately:
 ```
-node C:/Users/nafij/.claude/skills/WebSearch-node/scripts/fetch-youtube-transcript.mjs "$target"
+node C:/Users/nafij/.claude/skills/nafi-websearch-mcp/scripts/fetch-youtube-transcript.mjs "$target"
 ```
 Fetches the auto-generated or manual transcript, formats into paragraphs, and saves a .md file to ./temp_output/ (same as Scrape output). After saving, use the Read tool to display or summarize the content.
 
@@ -70,5 +70,5 @@ Optional flags:
 - --lang <code> — force a specific language (default: first available)
 
 Examples:
-- /WebSearch-node youtube "https://www.youtube.com/watch?v=FIbk8ALTolM"
-- /WebSearch-node youtube "FIbk8ALTolM" --lang en
+- /nafi-websearch-mcp youtube "https://www.youtube.com/watch?v=FIbk8ALTolM"
+- /nafi-websearch-mcp youtube "FIbk8ALTolM" --lang en

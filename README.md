@@ -17,8 +17,8 @@ A Model Context Protocol (MCP) server that provides robust web search, scraping,
 
 ```bash
 # Clone the repository
-git clone https://github.com/Nafi-Jza/websearch-mcp-node.git
-cd websearch-mcp-node
+git clone https://github.com/Nafi-Jza/nafi-websearch-mcp.git
+cd nafi-websearch-mcp
 
 # Install dependencies
 npm install
@@ -35,7 +35,7 @@ npm run build
 You can add this server to Claude Desktop or Claude Code via the `mcp add` command:
 
 ```bash
-claude mcp add websearch-node npx -y --prefix /absolute/path/to/websearch-mcp-node start
+claude mcp add nafi-websearch-mcp npx -y --prefix /absolute/path/to/nafi-websearch-mcp start
 ```
 
 Alternatively, edit your `claude_desktop_config.json` or `settings.json`:
@@ -43,10 +43,10 @@ Alternatively, edit your `claude_desktop_config.json` or `settings.json`:
 ```json
 {
   "mcpServers": {
-    "websearch-node": {
+    "nafi-websearch-mcp": {
       "command": "node",
       "args": [
-        "/absolute/path/to/websearch-mcp-node/dist/index.js"
+        "/absolute/path/to/nafi-websearch-mcp/dist/index.js"
       ]
     }
   }
