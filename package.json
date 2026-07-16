@@ -1,5 +1,5 @@
 {
-  "name": "nafi-websearch-mcp",
+  "name": "websearch-mcp",
   "version": "1.0.0",
   "description": "Node.js implementation of the WebSearch skill",
   "type": "module",
