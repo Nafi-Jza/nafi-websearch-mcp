@@ -7,7 +7,7 @@ import { scrapePage } from "./tools/scrape.js";
 import { openBrowser } from "./tools/open.js";
 import { getYouTubeTranscript } from "./tools/youtube.js";
 import { closeBrowserContext } from "./browser.js";
-import { logActivity, saveOutput } from "./utils/logger.js";
+import { logActivity } from "./utils/logger.js";
 
 const server = new Server({
     name: "websearch-mcp",
@@ -21,129 +21,55 @@ const server = new Server({
 server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
         tools: [
-            {
-                name: "search",
-                description: "Search the web using DuckDuckGo.",
-                inputSchema: {
-                    type: "object",
-                    properties: {
-                        query: { type: "string", description: "The search query." }
-                    },
-                    required: ["query"]
-                }
-            },
-            {
-                name: "scrape",
-                description: "Load a webpage and extract its main content as Markdown.",
-                inputSchema: {
-                    type: "object",
-                    properties: {
-                        url: { type: "string", description: "The URL of the webpage to scrape." }
-                    },
-                    required: ["url"]
-                }
-            },
-            {
-                name: "open_browser",
-                description: "Open a headed browser window to manually solve CAPTCHAs or log into sites. Pauses the MCP server until the user closes the browser.",
-                inputSchema: {
-                    type: "object",
-                    properties: {
-                        url: { type: "string", description: "An optional URL to navigate to when the browser opens." }
-                    }
-                }
-            },
-            {
-                name: "youtube_transcript",
-                description: "Extract the transcript from a YouTube video.",
-                inputSchema: {
-                    type: "object",
-                    properties: {
-                        target: { type: "string", description: "The YouTube video URL or ID." },
-                        lang: { type: "string", description: "Optional preferred language code (e.g., 'en', 'es')." }
-                    },
-                    required: ["target"]
-                }
-            }
+            { name: "search", description: "Search the web using DuckDuckGo.", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
+            { name: "scrape", description: "Load a webpage and extract its main content as Markdown.", inputSchema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
+            { name: "open_browser", description: "Open a headed browser window to manually solve CAPTCHAs or log into sites.", inputSchema: { type: "object", properties: { url: { type: "string" } } } },
+            { name: "youtube_transcript", description: "Extract transcript from YouTube video.", inputSchema: { type: "object", properties: { target: { type: "string" }, lang: { type: "string" } }, required: ["target"] } }
         ]
     };
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-
     try {
         switch (name) {
             case "search": {
-                if (!args || typeof args.query !== 'string') {
-                    throw new Error("Missing or invalid 'query' argument.");
-                }
+                if (!args || typeof args.query !== 'string') throw new Error("Missing query");
                 logActivity('search', `query: "${args.query}"`);
-
                 const result = await runSearch(args.query);
-
                 try {
-                    const parsedResult = JSON.parse(result);
-                    if (Array.isArray(parsedResult)) {
-                        logActivity('search-result', `Found ${parsedResult.length} results.\n${JSON.stringify(parsedResult.slice(0, 3), null, 2)}${parsedResult.length > 3 ? '\n  ...and ' + (parsedResult.length - 3) + ' more.' : ''}`);
-                    } else {
-                        logActivity('search-result', `: \n${result}`);
-                    }
-                } catch (e) {
-                    logActivity('search-result', `: \n${result}`);
-                }
-
+                    const parsed = JSON.parse(result);
+                    if (Array.isArray(parsed)) logActivity('search-result', `Found ${parsed.length} results`);
+                    else logActivity('search-result', result.slice(0, 500));
+                } catch { logActivity('search-result', result.slice(0, 500)); }
                 return { content: [{ type: "text", text: result }] };
             }
-
             case "scrape": {
-                if (!args || typeof args.url !== 'string') {
-                    throw new Error("Missing or invalid 'url' argument.");
-                }
+                if (!args || typeof args.url !== 'string') throw new Error("Missing url");
                 logActivity('scraping', `site: "${args.url}"`);
-
                 const result = await scrapePage(args.url);
-                const savedPath = saveOutput('scrape', result);
-
-                logActivity('scrape-output', `Saved to ${savedPath}\n(Preview: ${result.substring(0, 100).replace(/\n/g, ' ')}...)`);
-
+                logActivity('scrape-output', `Length ${result.length}`);
                 return { content: [{ type: "text", text: result }] };
             }
-
             case "open_browser": {
-                const url = args?.url && typeof args.url === 'string' ? args.url : undefined;
+                const url = args?.url as string | undefined;
                 logActivity('opening-browser', `URL: "${url || 'none'}"`);
-
                 const result = await openBrowser(url);
-                logActivity('browser-closed', `Output: ${result}`);
-
+                logActivity('browser-closed', result);
                 return { content: [{ type: "text", text: result }] };
             }
-
             case "youtube_transcript": {
-                if (!args || typeof args.target !== 'string') {
-                    throw new Error("Missing or invalid 'target' argument.");
-                }
-                const lang = args.lang && typeof args.lang === 'string' ? args.lang : undefined;
+                if (!args || typeof args.target !== 'string') throw new Error("Missing target");
                 logActivity('youtube-transcript', `target: "${args.target}"`);
-
-                const result = await getYouTubeTranscript(args.target, lang);
-                const savedPath = saveOutput('transcript', result);
-
-                logActivity('youtube-output', `Saved to ${savedPath}\n(Preview: ${result.substring(0, 100).replace(/\n/g, ' ')}...)`);
-
+                const result = await getYouTubeTranscript(args.target, args.lang as string | undefined);
+                logActivity('youtube-output', `Length ${result.length}`);
                 return { content: [{ type: "text", text: result }] };
             }
-
-            default:
-                throw new Error(`Unknown tool: ${name}`);
+            default: throw new Error(`Unknown tool: ${name}`);
         }
     } catch (error) {
-        logActivity('error', `Tool execution error in ${name}: ${(error as Error).message}`);
-        return {
-            content: [{ type: "text", text: `Error executing ${name}: ${(error as Error).message}` }],
-            isError: true
-        };
+        logActivity('error', `Tool ${name}: ${(error as Error).message}`);
+        return { content: [{ type: "text", text: `Error: ${(error as Error).message}` }], isError: true };
     }
 });
 
@@ -153,14 +79,10 @@ async function run() {
     logActivity('server', "WebSearch MCP Server initialized and ready.");
 }
 
-// Cleanup on exit
 process.on('SIGINT', async () => {
-    logActivity('server', "Shutting down MCP Server...");
+    logActivity('server', "Shutting down...");
     await closeBrowserContext();
     server.close(); process.exit(0);
 });
 
-run().catch(error => {
-    logActivity('error', `Failed to start server: ${error}`);
-    process.exit(1);
-});
+run().catch(error => { console.error(error); process.exit(1); });
