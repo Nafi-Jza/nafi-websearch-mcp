@@ -5,15 +5,11 @@ export async function runSearch(query: string): Promise<string> {
     const page = await context.newPage();
 
     try {
-        console.log(`Navigating to DuckDuckGo HTML search for: ${query}`);
-        await page.goto('https://html.duckduckgo.com/html/', { waitUntil: 'networkidle', timeout: 30000 });
+        // Construct the URL directly to bypass the homepage and form-filling
+        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+        console.log(`Navigating to DuckDuckGo search: ${searchUrl}`);
 
-        // Fill search form
-        await page.fill('#search_form_input_homepage', query);
-        await Promise.all([
-            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
-            page.click('#search_button_homepage')
-        ]);
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
         // Check for captcha/redirection blocks
         if (page.url().includes('duckduckgo.com/lite/') || page.url().includes('duckduckgo.com/x.js')) {
