@@ -21,6 +21,6 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "watch": "tail -f activity.log"
+    "watch": "powershell -Command \"Get-Content activity.log -Wait\""
   }
 }
